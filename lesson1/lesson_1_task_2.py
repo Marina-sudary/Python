@@ -1,6 +1,5 @@
 my_age = 56
-print(my_age)
+my_age = my_age + 3
 
-age_in_three_years = my_age + 3
-print("Мой возраст через 3 года", age_in_three_years)
+print("Мой возраст через 3 года", my_age)
 
