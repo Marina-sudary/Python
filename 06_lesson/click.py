@@ -9,16 +9,14 @@ from selenium.webdriver.support import expected_conditions as EC
  
 
 driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
-
 driver.get("http://uitestingplayground.com/ajax")
+wait = WebDriverWait(driver, 25)
 
-    
 driver.find_element(By.CSS_SELECTOR, "#ajaxButton").click()
-driver.implicitly_wait(20)
 
+success_message = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "p.bg-success")))
 
-content = driver.find_element(By.CSS_SELECTOR, "#content")
-txt = content.find_element(By.CSS_SELECTOR, "p.bg-success").text
+txt = success_message.text
 print(txt)
 
 driver.quit()
