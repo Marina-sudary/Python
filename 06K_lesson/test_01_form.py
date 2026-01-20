@@ -77,3 +77,7 @@ def test_zip_code_validation(driver):
         except AssertionError as e:
             print(str(e))
             raise
+
+        finally:
+            driver.quit()
+ 
