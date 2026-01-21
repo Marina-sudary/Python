@@ -6,8 +6,10 @@ from selenium import webdriver
 from selenium.webdriver.edge.service import Service
 from selenium.common.exceptions import TimeoutException
 
+
 def get_border_color(element):
-    return element.value_of_css_property('border-color')
+    return element.value_of_css_property("border-color")
+
 
 @pytest.fixture
 def driver():
@@ -17,10 +19,11 @@ def driver():
     yield driver
     driver.quit()
 
+
 def test_zip_code_validation(driver):
     wait = WebDriverWait(driver, 25)
     driver.get("https://bonigarcia.dev/selenium-webdriver-java/data-types.html")
-    
+
     wait.until(EC.presence_of_element_located((By.NAME, "first-name")))
 
     form_data = {
@@ -33,7 +36,7 @@ def test_zip_code_validation(driver):
         "city": "Москва",
         "country": "Россия",
         "job-position": "QA",
-        "company": "SkyPro"
+        "company": "SkyPro",
     }
 
     for name, value in form_data.items():
@@ -41,15 +44,17 @@ def test_zip_code_validation(driver):
         field.clear()
         field.send_keys(value)
 
-    submit_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit']")))
-    submit_button.click()
+    submit_button = wait.until(
+        EC.element_to_be_clickable((By.CSS_SELECTOR, "button[type='submit']"))
+    )
 
     try:
-        zip_div = wait.until(EC.presence_of_element_located((By.ID, "zip-code")))
+        submit_button.click()
+        wait.until(EC.presence_of_element_located((By.ID, "zip-code")))
     except TimeoutException:
-        print("Элемент #zip-code не найден или не появится в течение времени ожидания.")
-        raise
+        pytest.fail("Элемент zip-code не появился в течение времени ожидания.")
 
+    zip_div = driver.find_element(By.ID, "zip-code")
     zip_class = zip_div.get_attribute("class")
     print(f"Класс у #zip-code: {zip_class}")
 
@@ -60,8 +65,15 @@ def test_zip_code_validation(driver):
         raise AssertionError("ZIP-код не подсвечен alert-danger.")
 
     fields_to_check = [
-        "first-name", "last-name", "address", "e-mail", "phone",
-        "city", "country", "job-position", "company"
+        "first-name",
+        "last-name",
+        "address",
+        "e-mail",
+        "phone",
+        "city",
+        "country",
+        "job-position",
+        "company",
     ]
 
     for field_id in fields_to_check:
@@ -69,15 +81,11 @@ def test_zip_code_validation(driver):
             elem = wait.until(EC.presence_of_element_located((By.ID, field_id)))
             classes = elem.get_attribute("class")
             print(f"{field_id} class: {classes}")
-            
-            assert "alert-success" in classes, f"{field_id} не подсвечено green (alert-success)"
+            assert (
+                "alert-success" in classes
+            ), f"{field_id} не подсвечено green (alert-success)"
         except TimeoutException:
-            print(f"Элемент с ID='{field_id}' не найден.")
-            raise
+            pytest.fail(f"Элемент с ID='{field_id}' не найден или не появился вовремя.")
         except AssertionError as e:
             print(str(e))
             raise
-
-        finally:
-            driver.quit()
- 

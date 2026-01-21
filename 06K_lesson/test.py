@@ -11,18 +11,22 @@ def test_slow_calculator():
     wait = WebDriverWait(driver, 60)
 
     try:
+        # Открываем страницу
         driver.get(
             "https://bonigarcia.dev/selenium-webdriver-java/slow-calculator.html"
         )
 
+        # Вводим задержку
         delay_input = wait.until(
             EC.element_to_be_clickable((By.CSS_SELECTOR, "#delay"))
         )
         delay_input.clear()
         delay_input.send_keys("45")
 
+        # Добавляем небольшую паузу, чтобы значение применилось
         wait.until(lambda d: delay_input.get_attribute("value") == "45")
 
+        # Клики по кнопкам: 7, +, 8, =
         button_texts = ["7", "+", "8", "="]
         for text in button_texts:
             button = wait.until(
@@ -30,6 +34,7 @@ def test_slow_calculator():
             )
             button.click()
 
+        # Проверка результата
         answer_locator = (By.CSS_SELECTOR, "div.screen")
         wait.until(EC.text_to_be_present_in_element(answer_locator, "15"))
 
