@@ -2,81 +2,101 @@ import uuid
 import pytest
 from yougile_api import YougileAPI
 
-
-url = "https://ru.yougile.com"
+URL = "https://ru.yougile.com"
 API_KEY = "iRrsh698igTNOkomDwSHVITWqEwHQ7PRGtK3dU7tl0Ml7qMHfLV-oQxizuuZCttX"
 
-@pytest.fixture(scope="session")
+
+@pytest.fixture(scope="function")
 def api_client():
-    return YougileAPI(url, API_KEY)
+    """API клиент для каждого теста."""
+    return YougileAPI(URL, API_KEY)
 
 
-@pytest.fixture(scope="session")
-def created_project_id(api_client) -> str:
-    """
-    Создаёт проект, чтобы использовать в позитивных тестах GET/PUT.
-    """
-    payload = {
-        "name": f"Fixture Project {uuid.uuid4()}",
-        "description": "Created for tests"
-    }
+@pytest.fixture(scope="function")
+def created_project(api_client):
+    """Создает проект и удаляет после теста."""
+    project_name = f"test-{uuid.uuid4().hex[:8]}"
+    payload = {"name": project_name, "description": "test project"}
+
     resp = api_client.create_project(payload)
-    assert resp.status_code == 201, f"Failed creating fixture project: {resp.status_code} {resp.text}"
-    return resp.json()["id"]
+    assert resp.status_code == 201, f"Create failed: {resp.status_code}"
+    project_id = resp.json()["id"]
+
+    yield project_id
+
+    # Очистка: удаляем проект после теста
+    delete_resp = api_client.delete_project(project_id)
+    assert delete_resp.status_code in (200, 204, 404), "Cleanup failed"
 
 
 class TestProjectsAPI:
-    # ========== POST /api-v2/projects ==========
+    """Тесты CRUD операций с проектами."""
+
     def test_create_project_positive(self, api_client):
-        payload = {"name": f"Positive create {uuid.uuid4()}"}
+        """Позитив: создание проекта."""
+        payload = {"name": f"POS-{uuid.uuid4().hex[:8]}"}
         resp = api_client.create_project(payload)
+
         assert resp.status_code == 201
         body = resp.json()
-        assert "id" in body and body["name"] == payload["name"]
+        assert "id" in body
+        assert body["name"] == payload["name"]
 
     def test_create_project_negative_empty_name(self, api_client):
-        # Ожидаем ошибку валидации (400 или 422) при отсутствии name
+        """Негатив: создание без name."""
         payload = {"description": "no name"}
         resp = api_client.create_project(payload)
+
         assert resp.status_code in (400, 422)
-        # Если API возвращает структуру с errors, проверим наличие name в ошибках
-        try:
-            body = resp.json()
-        except ValueError:
-            body = {}
-        errors = body.get("errors") or body
-        # допустимо, что структура ошибок разная — проверяем, что есть указание на name
-        assert ("name" in errors) or ("Name" in errors) or ("name" in str(body).lower())
+        body = resp.json()
+        error_text = str(body).lower()
+        assert any(
+            msg in error_text
+            for msg in ["name", "required", "обязательно"]
+        )
 
-    # ========== GET /api-v2/projects/{id} ==========
-    def test_get_project_positive(self, api_client, created_project_id):
-        resp = api_client.get_project(created_project_id)
+    def test_get_project_positive(self, api_client, created_project):
+        """Позитив: получение проекта."""
+        resp = api_client.get_project(created_project)
         assert resp.status_code == 200
         body = resp.json()
-        assert body.get("id") == created_project_id
-        assert "name" in body
+        assert body["id"] == created_project
 
-    def test_get_project_negative_nonexistent_id(self, api_client):
-        nonexistent_id = str(uuid.uuid4())
-        resp = api_client.get_project(nonexistent_id)
+    def test_get_project_negative_nonexistent(self, api_client):
+        """Негатив: несуществующий проект."""
+        fake_id = str(uuid.uuid4())
+        resp = api_client.get_project(fake_id)
+
         assert resp.status_code == 404
+        body = resp.json()
+        error_text = str(body).lower()
+        assert any(msg in error_text for msg in ["not found", "не найден"])
 
-    # ========== PUT /api-v2/projects/{id} ==========
-    def test_update_project_positive(self, api_client, created_project_id):
-        update_payload = {"name": f"Updated name {uuid.uuid4()}", "description": "updated"}
-        resp = api_client.update_project(created_project_id, update_payload)
+    def test_update_project_positive(self, api_client, created_project):
+        """Позитив: обновление проекта."""
+        new_name = f"UPDATED-{uuid.uuid4().hex[:8]}"
+        payload = {"name": new_name}
+        resp = api_client.update_project(created_project, payload)
+
         assert resp.status_code == 200
         body = resp.json()
-        assert body.get("name") == update_payload["name"]
+        assert body["name"] == new_name
 
     def test_update_project_negative_invalid_id(self, api_client):
-        invalid_id = "invalid-uuid-format"
-        update_payload = {"name": "Should fail"}
-        resp = api_client.update_project(invalid_id, update_payload)
-        # API может вернуть 404 (not found) или 400 (bad request) for invalid id format
-        assert resp.status_code in (400, 404)
+        """Негатив: неверный ID."""
+        invalid_id = "invalid-uuid"
+        payload = {"name": "test"}
+        resp = api_client.update_project(invalid_id, payload)
 
-    def test_update_project_negative_empty_body(self, api_client, created_project_id):
-        # Попытка обновления с пустым телом — ожидаем ошибку валидации
-        resp = api_client.update_project(created_project_id, {})
+        assert resp.status_code in (400, 404)
+        body = resp.json()
+        error_text = str(body).lower()
+        assert any(msg in error_text for msg in ["invalid", "неверный"])
+
+    def test_update_project_negative_empty_body(self, api_client, created_project):
+        """Негатив: пустое тело обновления."""
+        resp = api_client.update_project(created_project, {})
         assert resp.status_code in (400, 422)
+        body = resp.json()
+        error_text = str(body).lower()
+        assert any(msg in error_text for msg in ["name", "required"])
